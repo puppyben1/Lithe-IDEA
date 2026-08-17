@@ -3315,6 +3315,10 @@ fire_and_forget MainWindow::ConfigureAICommitClick(IInspectable const&, RoutedEv
 }
 
 void MainWindow::CheckForUpdatesClick(IInspectable const&, RoutedEventArgs const&) {
+    checkForUpdates();
+}
+
+void MainWindow::checkForUpdates() {
 #if defined(_M_ARM64)
     session_->checkForUpdates("arm64");
 #elif defined(_M_X64)
@@ -4054,6 +4058,10 @@ void MainWindow::RootLoaded(IInspectable const&, RoutedEventArgs const&) {
         showWelcomeSurface();
     } else {
         showWorkbenchSurface();
+    }
+    if (!startupUpdateCheckStarted_) {
+        startupUpdateCheckStarted_ = true;
+        checkForUpdates();
     }
 }
 
