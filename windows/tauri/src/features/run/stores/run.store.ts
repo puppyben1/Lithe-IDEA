@@ -1080,7 +1080,10 @@ export const createRunStore = (
             const stepResolved = await dependencies.resolveRunLaunch({
               root,
               executable: step.executable,
-              workingDirectory: plan.workingDirectory,
+              // A step may own its resolution root: the Maven resource step runs
+              // from the reactor so a project wrapper is found even when the
+              // application working directory is overridden.
+              workingDirectory: step.workingDirectory ?? plan.workingDirectory,
               javaHomePath: configuration.javaHomePath,
               ...mavenProcessPaths(mavenContext, configuration),
               runtimeExecutablePaths: state.effectiveRuntimeExecutablePaths,

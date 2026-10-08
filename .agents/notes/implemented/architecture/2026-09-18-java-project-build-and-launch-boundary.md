@@ -46,7 +46,15 @@ Issue #1133 中，Java watcher 只转发源码和构建配置，资源变更归�
 而 JDT 的成功构建结果不能证明 Maven 资源已更新。资源处理复用 Maven 的
 Profile、settings、local repository、模块 `-pl/-am` 参数，让自定义资源目录、
 过滤变量和依赖模块继续由 POM 决定。即使运行配置改了 cwd，前置步骤也通过
-绝对 `-f` 指向选定 reactor 的 POM。失败必须展示 Maven 输出并阻止 JVM 启动。
+绝对 `-f` 指向选定 reactor 的 POM，并在自己的 `workingDirectory` 里执行：
+这一步的目录同时是工具链解析根，所以应用 cwd 被覆盖成用户自定义目录时，仍然
+能在 reactor POM 旁边找到项目自带的 Maven wrapper（`mvnw`/`mvnw.cmd`）。每个
+前置步骤可以声明自己的 `workingDirectory`；不声明就继承计划的
+`workingDirectory`。失败必须展示 Maven 输出并阻止 JVM 启动，Run 面板的服务
+会话与普通应用启动消费同一份前置步骤：会话在资源处理成功前不启动 JVM，
+停止、重启或配置被回收时会取消该会话正在运行的前置进程。
+开发者新增前置步骤时，如果它必须在某个子目录里运行或从那里解析工具链，
+就填 `workingDirectory`，不要靠宿主临时改 cwd，也不要把 wrapper 路径写死。
 不要自己递归复制 `src/main/resources`，也不要用固定延迟等待 watcher：前者
 绕过 Maven 过滤与自定义目录，后者没有构建完成保证。代价是每次直启多一个
 Maven 资源处理进程；不运行 `compile`、`exec:java` 或 `spring-boot:run`，Java
@@ -195,6 +203,9 @@ Run 控件，也不在 `java-run-launch` 或平台 adapter 再做一次 `blocksR
 
 - 多模块 Maven 的 Java Main 和已解析入口的 Spring Boot 服务只会启动一次，不再
   在父模块或依赖模块找主类。
+- Run 面板的每个 Maven 直启服务同样要在启动前跑一遍资源处理，所以停止和重启
+  服务时也会一并取消尚未完成的资源处理进程；代价是每次启动多一个 Maven 进程，
+  换来的是“改完 `application-*.yml` 立刻生效”。
 - Maven 生成源码、测试源码 Main 和 JPMS module-path 使用同一项目模型。
 - 点击运行可能需要等待 Java 语言服务 ready；构建失败会保留真实诊断，并在目标路径
   仍可解析时暂停等待用户决定，而不是永久阻止启动。
@@ -214,6 +225,11 @@ Run 控件，也不在 `java-run-launch` 或平台 adapter 再做一次 `blocksR
 ## 验证
 
 - 资源处理参数与独立子项目兼容：`cargo test --manifest-path rust/Cargo.toml -p lithe-core --lib tests::run_configuration::`。
+- macOS 服务会话消费前置步骤的顺序、失败阻止 JVM 和 Stop 取消：
+  `macos/Tests/LitheExecutionModuleTests/ExecutionModuleTests.swift` 中的
+  `serviceSessionRunsItsPreLaunchStepFromTheReactorBeforeLaunching`、
+  `serviceSessionPreLaunchFailureLeavesTheServiceFailed` 与
+  `stoppingAServiceCancelsItsRunningPreLaunchStep`；运行 `./scripts/test-macos.sh`。
 - Windows 前置进程的失败、期限和窗口关闭：`cargo test --manifest-path windows/tauri/src-tauri/Cargo.toml run::tests::prelaunch`。
 - Windows Run 的顺序与取消：`run-prelaunch.test.ts`、`run-host-api.test.ts`；用 Windows Frontend 稳定性计时入口运行。
 

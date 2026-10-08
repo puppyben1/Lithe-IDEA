@@ -436,7 +436,8 @@ fn run_configuration_generation_uses_a_maven_project_below_the_workspace() {
         serde_json::json!([{
             "executable": {"toolchain": "project-maven"},
             "arguments": ["-B", "-ntp", "-P", "dev,qa", "-s", "/local/settings.xml",
-                "-pl", "service", "-am", "-DskipTests", "-f", reactor_pom, "resources:resources"]
+                "-pl", "service", "-am", "-DskipTests", "-f", reactor_pom, "resources:resources"],
+            "workingDirectory": "projects/demo"
         }])
     );
 
@@ -497,6 +498,12 @@ fn run_configuration_generation_uses_a_maven_project_below_the_workspace() {
             "resources:resources"
         ])
     );
+    // An overridden application working directory must not move the step's own
+    // Maven wrapper/POM resolution root off the reactor.
+    assert_eq!(
+        overridden_plan["data"]["preLaunchSteps"][0]["workingDirectory"],
+        "projects/demo"
+    );
     assert_eq!(
         overridden_plan["data"]["arguments"],
         serde_json::json!(["com.example.App"])
@@ -546,6 +553,10 @@ fn run_configuration_generation_uses_a_maven_project_below_the_workspace() {
             reactor_pom,
             "resources:resources"
         ])
+    );
+    assert_eq!(
+        java_plan["data"]["preLaunchSteps"][0]["workingDirectory"],
+        "projects/demo"
     );
     assert_eq!(
         java_plan["data"]["arguments"],
@@ -1093,7 +1104,8 @@ fn maven_test_source_main_uses_the_test_classpath() {
         serde_json::json!([{
             "executable": {"toolchain": "project-maven"},
             "arguments": ["-B", "-ntp", "-f", root.join(".").join("pom.xml"),
-                "resources:resources", "resources:testResources"]
+                "resources:resources", "resources:testResources"],
+            "workingDirectory": "."
         }])
     );
 

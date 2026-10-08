@@ -1958,6 +1958,11 @@ pub fn create_launch_plan(request: LaunchPlanRequest) -> Result<Value, CoreError
         pre_launch_steps.push(json!({
             "executable": resource_plan.executable,
             "arguments": resource_plan.arguments,
+            // The reactor directory is the step's own resolution root: the host
+            // finds the project's Maven wrapper there even when the application
+            // working directory is overridden, and the absolute `-f` above keeps
+            // the POM anchored.
+            "workingDirectory": resource_plan.working_directory,
         }));
     } else if is_java_main {
         let source = config["extensions"]["java"]["source"]

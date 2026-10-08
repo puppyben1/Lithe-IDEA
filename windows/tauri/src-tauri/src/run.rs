@@ -3212,6 +3212,35 @@ mod tests {
         fs::remove_dir_all(home).ok();
     }
 
+    /// The plan's resource step declares the reactor as its own working
+    /// directory. A workspace whose root has no wrapper must still resolve the
+    /// wrapper next to the reactor POM: the absolute `-f` argument anchors the
+    /// POM but cannot help find `mvnw.cmd`.
+    #[test]
+    fn resolve_maven_executable_finds_the_wrapper_beside_the_reactor_pom() {
+        let home = temp_project();
+        let reactor = home.join("projects").join("demo");
+        fs::create_dir_all(reactor.join(".mvn").join("wrapper")).expect("wrapper directory");
+        fs::write(reactor.join("pom.xml"), b"<project/>").expect("pom");
+        fs::write(reactor.join("mvnw.cmd"), b"").expect("mvnw.cmd");
+        fs::write(
+            reactor
+                .join(".mvn")
+                .join("wrapper")
+                .join("maven-wrapper.properties"),
+            b"distributionUrl=https://example.invalid/maven-bin.zip",
+        )
+        .expect("wrapper properties");
+
+        let resolved = resolve_maven_executable(&home, &reactor, "").expect("resolve wrapper");
+        assert!(resolved.ends_with("mvnw.cmd"), "resolved = {resolved}");
+        assert!(
+            resolved.contains("demo"),
+            "the wrapper must come from the reactor directory: {resolved}"
+        );
+        fs::remove_dir_all(home).ok();
+    }
+
     /// The host used to return a message that hid the operating system's
     /// reason, so every failure read "Unable to start the run configuration."
     #[test]

@@ -133,17 +133,31 @@ describe("Standalone Java compile-then-run", () => {
             workingDirectory: "custom-run",
             classpath: ["D:/work/app/target/classes"],
             preLaunchSteps: [
-              { executable: { toolchain: "project-maven" }, arguments: resourceArguments },
+              {
+                executable: { toolchain: "project-maven" },
+                arguments: resourceArguments,
+                workingDirectory: "app",
+              },
             ],
           }),
-          resolveRunLaunch: async (request) => ({
-            executable: request.executable.toolchain === "project-maven" ? "mvn.cmd" : "java.exe",
-            workingDirectory: "D:/work/custom-run",
-            environment: {},
-          }),
+          resolveRunLaunch: async (request) => {
+            if (request.executable.toolchain === "project-maven") {
+              // The resource step resolves Maven from the reactor (and finds a
+              // project wrapper there) instead of the overridden cwd.
+              expect(request.workingDirectory).toBe("app");
+              return { executable: "mvn.cmd", workingDirectory: "D:/work/app", environment: {} };
+            }
+            expect(request.workingDirectory).toBe("custom-run");
+            return {
+              executable: "java.exe",
+              workingDirectory: "D:/work/custom-run",
+              environment: {},
+            };
+          },
           executePreLaunchStep: async (request) => {
             expect(request.executable).toBe("mvn.cmd");
             expect(request.arguments).toEqual(resourceArguments);
+            expect(request.workingDirectory).toBe("D:/work/app");
             events.push("resources");
             return { exitCode, output: "resource processing output\n" };
           },
