@@ -1547,9 +1547,11 @@ struct ExecutionModuleTests {
         let service = RunService(
             runtime: TestRuntime(), process: TestStreamingProcess(),
             processFactory: { recorder.make() },
+            // Built the same way `resolvedWorkingDirectory` builds its result,
+            // so the directory check compares equal directory URLs.
             fileAccess: TestRunFileAccess(directories: [
-                root.appendingPathComponent("app", isDirectory: true).standardizedFileURL,
-                root.appendingPathComponent("custom-run", isDirectory: true).standardizedFileURL,
+                URL(fileURLWithPath: "app", relativeTo: root).standardizedFileURL,
+                URL(fileURLWithPath: "custom-run", relativeTo: root).standardizedFileURL,
             ]),
             preferences: TestRunPreferences(), serverPortParser: TestServerPortParser(),
             runConfigurationOperations: FixedLaunchPlanRunConfigurationOperations(
