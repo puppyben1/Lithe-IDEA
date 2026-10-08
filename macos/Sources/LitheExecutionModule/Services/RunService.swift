@@ -1554,8 +1554,8 @@ package final class RunService: ObservableObject {
     }
 
     /// Runs one pre-launch step, then chains to the next on a zero exit or aborts
-    /// the run and surfaces the compiler's diagnostics on a non-zero exit. Uses a
-    /// fresh process per step so the main run process wiring stays untouched.
+    /// the run and surfaces the step's output on a non-zero exit. Uses a fresh
+    /// process per step so the main run process wiring stays untouched.
     private func runPreLaunchStep(
         at index: Int,
         steps: [PreparedLaunchStep],
@@ -1589,7 +1589,7 @@ package final class RunService: ObservableObject {
                         onSuccess: onSuccess
                     )
                 } else {
-                    self.append("\nCompilation failed (exit code \(exitCode)).\n")
+                    self.append("\nPre-launch step failed (exit code \(exitCode)).\n")
                     self.isRunning = false
                     self.runningTitle = nil
                     self.activeOperationID = nil

@@ -1048,7 +1048,7 @@ export const createRunStore = (
             }
           };
           const markPreLaunchFailure = (exitCode: number) => {
-            const message = `Compilation failed (exit code ${exitCode}).\n`;
+            const message = `Pre-launch step failed (exit code ${exitCode}).\n`;
             if (sessionId === PRIMARY_SESSION_ID) {
               set((current) => ({
                 primaryRunning: false,
@@ -1094,6 +1094,8 @@ export const createRunStore = (
               `$ ${stepResolved.executable.split(/[\\/]/).pop()} ${stepArguments.join(" ")}\n`,
             );
             const outcome = await dependencies.executePreLaunchStep({
+              sessionId,
+              executionId,
               executable: stepResolved.executable,
               arguments: stepArguments,
               workingDirectory: stepResolved.workingDirectory,

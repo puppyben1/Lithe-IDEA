@@ -1512,7 +1512,7 @@ struct ExecutionModuleTests {
         try await awaitTestValue(service.$lastExitCode, matching: { $0 == 1 })
         #expect(mainProcess.startRequests.isEmpty)
         #expect(!service.isRunning)
-        #expect(service.output.contains("Compilation failed (exit code 1)"))
+        #expect(service.output.contains("Pre-launch step failed (exit code 1)"))
     }
 
     @Test

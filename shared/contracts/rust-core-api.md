@@ -2210,6 +2210,19 @@ so existing single-process Maven, Gradle, and Node
 plans are unchanged. Pre-launch steps and the main process share the plan-level
 `workingDirectory` and `environment`.
 
+Direct Maven-project Java launches also carry a `project-maven` resource step:
+`resources:resources`, plus `resources:testResources` for test-source entrypoints.
+The step inherits Maven profiles, settings, repository and module/dependency
+selection. Its absolute `-f` POM argument anchors the generated reactor even when
+the application working directory is overridden. A child POM not declared in
+that reactor is processed as its own Maven project, without `-pl`. Resource
+filtering and custom resource directories remain Maven-owned; no Java compilation
+or application launch goal is added. Hosts must finish these steps successfully
+before starting the JVM. Windows pre-launch execution is window/session/execution
+scoped, stops its owned process tree on Stop, window close or replacement, and has a ten-minute
+deadline with bounded pipe draining and cleanup. Independent DAP launches that do
+not consume this plan are not covered by this resource-step contract.
+
 A Maven-project `java.main` launch must first ask JDT LS/Java Debug
 Server to resolve the exact source target, build its owning project, and return
 the runtime classpath/module path. Missing project launch metadata is a launch
