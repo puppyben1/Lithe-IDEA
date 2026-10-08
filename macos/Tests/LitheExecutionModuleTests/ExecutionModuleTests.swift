@@ -1349,6 +1349,8 @@ struct ExecutionModuleTests {
         let stepRequest = try #require(step.startRequests.first)
         #expect(stepRequest.executablePath == "/test/bin/javac")
         #expect(stepRequest.arguments == ["-d", outputDirectory, "Standalone.java"])
+        // The application entry bounds its compile step exactly like Windows.
+        #expect(stepRequest.timeoutMilliseconds == 600_000)
         #expect(mainProcess.startRequests.isEmpty)
 
         // A zero exit chains to the main process, which launches by class name
@@ -1573,6 +1575,9 @@ struct ExecutionModuleTests {
         #expect(stepRequest.executablePath == "/test/bin/project-maven")
         #expect(stepRequest.arguments == resourceArguments)
         #expect(stepRequest.workingDirectory.hasSuffix("/workspace/app"))
+        // A resource step that never finishes must fail within the same bound
+        // Windows applies instead of leaving the session running forever.
+        #expect(stepRequest.timeoutMilliseconds == 600_000)
         #expect(recorder.processes.count == 1)
         #expect(service.moduleSessions.first?.isRunning == true)
 
@@ -1689,6 +1694,70 @@ struct ExecutionModuleTests {
         await #expect(throws: TestObservationError.self) {
             try await awaitSignal(recorder.started.stream, timeout: .milliseconds(500))
         }
+        #expect(recorder.processes.count == 1)
+    }
+
+    /// Issue #1133 / PR review: the platform deadline must fail the session and
+    /// name that deadline. Windows reports the same wording, so a stuck Maven
+    /// resource step ends the same way on both platforms.
+    @Test
+    func servicePreLaunchDeadlineFailsTheSessionAndNamesTheDeadline() async throws {
+        let recorder = SessionProcessRecorder()
+        let configuration = RunConfiguration(
+            id: "service:demo", name: "demo", kind: .javaMain,
+            execution: .service, modulePath: "app", mainClass: "example.Main"
+        )
+        let plan = SharedLaunchPlan(
+            executable: .toolchain("project-jdk"),
+            arguments: ["example.Main"],
+            workingDirectory: "app",
+            preLaunchSteps: [
+                SharedLaunchPlan.PreLaunchStep(
+                    executable: .toolchain("project-maven"),
+                    arguments: ["-B", "-ntp", "-f", "/workspace/app/pom.xml", "resources:resources"]
+                )
+            ]
+        )
+        let root = URL(fileURLWithPath: "/workspace", isDirectory: true)
+        let service = RunService(
+            runtime: TestRuntime(), process: TestStreamingProcess(),
+            processFactory: { recorder.make() },
+            // Built the same way `resolvedWorkingDirectory` builds its result,
+            // so the reactor directory resolves instead of falling back.
+            fileAccess: TestRunFileAccess(directories: [
+                URL(fileURLWithPath: "app", relativeTo: root).standardizedFileURL,
+            ]),
+            preferences: TestRunPreferences(), serverPortParser: TestServerPortParser(),
+            runConfigurationOperations: FixedLaunchPlanRunConfigurationOperations(
+                configuration: configuration, plan: plan
+            ),
+            executableResolver: ToolNamedExecutableResolver(),
+            languageProviderCatalog: .compatibilityFallback,
+            languageRunProviders: .standard(catalog: .compatibilityFallback)
+        )
+        defer { service.reset() }
+        await service.loadProject(at: root, files: [], mavenProject: nil)
+
+        service.startConfiguration(configuration)
+        let step = try #require(recorder.processes.first)
+        let stepRequest = try #require(step.startRequests.first)
+        #expect(stepRequest.timeoutMilliseconds == 600_000)
+
+        // The platform reports its deadline and then terminates the owned
+        // process, exactly as `MacStreamingProcess` does on timeout.
+        step.onStateChange?(ProcessLifecycleEvent(
+            operationID: stepRequest.operationID,
+            state: .stopping,
+            exitCode: nil,
+            message: "Process timed out"
+        ))
+        try await awaitTestValue(service.$moduleSessions, matching: {
+            $0.first?.output.contains("Pre-launch step timed out after 600 seconds.") == true
+        })
+
+        step.onTermination?(15)
+        try await awaitTestValue(service.$moduleSessions, matching: { $0.first?.exitCode == 15 })
+        #expect(service.moduleSessions.first?.isRunning == false)
         #expect(recorder.processes.count == 1)
     }
 

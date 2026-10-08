@@ -2225,9 +2225,11 @@ child POM not declared in
 that reactor is processed as its own Maven project, without `-pl`. Resource
 filtering and custom resource directories remain Maven-owned; no Java compilation
 or application launch goal is added. Hosts must finish these steps successfully
-before starting the JVM. Windows pre-launch execution is window/session/execution
-scoped, stops its owned process tree on Stop, window close or replacement, and has a ten-minute
-deadline with bounded pipe draining and cleanup. macOS runs the steps before both
+before starting the JVM. Both hosts scope pre-launch execution to the
+window/session/execution and stop the owned process tree on Stop, window close or
+replacement. They apply the same ten-minute deadline with bounded pipe draining
+and cleanup, and a step that reaches its deadline fails the run with
+`Pre-launch step timed out after 600 seconds.`. macOS runs the steps before both
 the application launch and a Run-panel service session, and cancels a session's
 running step when that session stops, restarts, or is dropped by reconciliation.
 Independent DAP launches that do

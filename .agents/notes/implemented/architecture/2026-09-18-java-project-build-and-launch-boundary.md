@@ -62,10 +62,13 @@ Maven 资源处理进程；不运行 `compile`、`exec:java` 或 `spring-boot:ru
 或共享 worktree 缓存，不新增可复用构建资源。
 
 未在 reactor 声明的独立子 POM 按自身项目处理，不用 `-pl` 选择不存在的
-聚合模块；生成配置记录的 reactor 优先于当前工具窗口选择。Windows 前置
-进程复用原生进程 runner 的进程树所有权、输出上限和有界清理；Stop 或
-替换执行或关闭窗口使其 reservation 失效，十分钟未完成则终止并展示失败。独立 DAP
-启动若没有消费这个运行计划，不在本次资源同步修复范围内，不宣称已修复。
+聚合模块；生成配置记录的 reactor 优先于当前工具窗口选择。两个平台的前置
+进程都复用各自原生进程 runner 的进程树所有权、输出上限和有界清理；Stop、
+替换执行或关闭窗口使其 reservation 失效，十分钟未完成则终止并展示失败。
+macOS 与 Windows 用同一个 600 秒期限，超时都追加
+`Pre-launch step timed out after 600 seconds.`，避免卡死的前置步骤在某个
+平台永久停留在运行状态。独立 DAP 启动若没有消费这个运行计划，不在本次
+资源同步修复范围内，不宣称已修复。
 
 Run 和 Debug 共用同一套 Java 项目准备逻辑。配置中的 Maven 信息仍用于 JDT LS
 导入、Profile、settings.xml 和项目模型；Maven 工具窗口、框架 goal、测试与显式
@@ -225,11 +228,12 @@ Run 控件，也不在 `java-run-launch` 或平台 adapter 再做一次 `blocksR
 ## 验证
 
 - 资源处理参数与独立子项目兼容：`cargo test --manifest-path rust/Cargo.toml -p lithe-core --lib tests::run_configuration::`。
-- macOS 服务会话消费前置步骤的顺序、失败阻止 JVM 和 Stop 取消：
+- macOS 服务会话消费前置步骤的顺序、失败阻止 JVM、Stop 取消和超时期限：
   `macos/Tests/LitheExecutionModuleTests/ExecutionModuleTests.swift` 中的
   `serviceSessionRunsItsPreLaunchStepFromTheReactorBeforeLaunching`、
-  `serviceSessionPreLaunchFailureLeavesTheServiceFailed` 与
-  `stoppingAServiceCancelsItsRunningPreLaunchStep`；运行 `./scripts/test-macos.sh`。
+  `serviceSessionPreLaunchFailureLeavesTheServiceFailed`、
+  `stoppingAServiceCancelsItsRunningPreLaunchStep` 与
+  `servicePreLaunchDeadlineFailsTheSessionAndNamesTheDeadline`；运行 `./scripts/test-macos.sh`。
 - Windows 前置进程的失败、期限和窗口关闭：`cargo test --manifest-path windows/tauri/src-tauri/Cargo.toml run::tests::prelaunch`。
 - Windows Run 的顺序与取消：`run-prelaunch.test.ts`、`run-host-api.test.ts`；用 Windows Frontend 稳定性计时入口运行。
 

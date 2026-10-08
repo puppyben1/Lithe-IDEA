@@ -83,6 +83,11 @@ package final class RunService: ObservableObject {
     private var modulePreLaunchProcesses: [String: any StreamingProcess] = [:]
     private var moduleOperationIDs: [String: String] = [:]
     private let maximumOutputCharacters = 500_000
+    /// The same bound the Windows pre-launch runner applies (`PRE_LAUNCH_TIMEOUT`
+    /// in `windows/tauri/src-tauri/src/run.rs`). A resource step is a Maven
+    /// build, so a step that never finishes must fail the run on both platforms
+    /// instead of leaving it "running" until a manual Stop.
+    private static let preLaunchStepTimeoutMilliseconds = 600_000
     private let runtime: any RunRuntimePort
     private let executableResolver: any RunExecutableResolving
     private let javaLaunchArgumentPreparer: (any JavaLaunchArgumentPreparing)?
@@ -1599,6 +1604,16 @@ package final class RunService: ObservableObject {
         stepProcess.onOutput = { chunk in
             Task { @MainActor in owner.append(chunk) }
         }
+        // The platform stops a step that passes its deadline with this message.
+        // Name the deadline in the Run's own wording, as the test service and
+        // the Windows runner do; a user Stop uses another message and stays
+        // silent, because the Stop itself is already visible.
+        let timedOutNotice =
+            "\nPre-launch step timed out after \(Self.preLaunchStepTimeoutMilliseconds / 1_000) seconds.\n"
+        stepProcess.onStateChange = { event in
+            guard event.state == .stopping, event.message == "Process timed out" else { return }
+            Task { @MainActor in owner.append(timedOutNotice) }
+        }
         stepProcess.onTermination = { exitCode in
             Task { @MainActor in
                 owner.setStepProcess(nil)
@@ -1622,7 +1637,8 @@ package final class RunService: ObservableObject {
                 executablePath: step.executablePath,
                 arguments: step.arguments,
                 workingDirectory: step.workingDirectory,
-                environment: step.environment
+                environment: step.environment,
+                timeoutMilliseconds: Self.preLaunchStepTimeoutMilliseconds
             ))
         } catch {
             owner.setStepProcess(nil)
